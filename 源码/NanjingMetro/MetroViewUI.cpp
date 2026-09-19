@@ -160,9 +160,14 @@ void CNanjingMetroView::DrawInteractionHeader(CDC* dc,const CRect& r) // 编写�
     Text(dc,_T("南京地铁 · 出行指南"),CRect(Ui(32),Ui(19),r.right-Ui(224),Ui(54)),ink);
     dc->SelectObject(&m_uiFont);
     Text(dc,_T("站点查询 / 周边导向 / 首末班车"),CRect(Ui(33),Ui(56),r.right-Ui(224),Ui(79)),muted);
+    const std::vector<MetroLine>& lines=GetDocument()->m_metroData.m_lines;
     int x=Ui(33),y=Ui(90);
-    for(const auto& line:GetDocument()->m_metroData.m_lines){dc->FillSolidRect(x,y,Ui(20),Ui(4),line.color);Text(dc,line.lineName,CRect(x+Ui(27),y-Ui(9),x+Ui(90),y+Ui(13)),ink);x+=Ui(93);}
-    CString status;status.Format(_T("6 条线路 · 129 站    |    缩放 %d%%    |    拖动平移 · 滚轮缩放 · Ctrl+F 搜索"),(int)(m_zoom*100));
+    const int legendLimit=r.right-Ui(20);
+    for(const auto& line:lines){
+        if(x+Ui(74)>legendLimit){x=Ui(33);y+=Ui(20);} // 线路过多时自动换行
+        dc->FillSolidRect(x,y,Ui(20),Ui(4),line.color);Text(dc,line.lineName,CRect(x+Ui(27),y-Ui(9),x+Ui(90),y+Ui(13)),ink);x+=Ui(93);
+    }
+    CString status;status.Format(_T("%d 条线路 · %d 站    |    缩放 %d%%    |    拖动平移 · 滚轮缩放 · Ctrl+F 搜索"),(int)lines.size(),(int)GetDocument()->m_metroData.m_stations.size(),(int)(m_zoom*100));
     Text(dc,status,CRect(Ui(20),r.bottom-Ui(28),r.right-Ui(20),r.bottom-Ui(5)),muted);
     dc->SelectObject(old);
 }

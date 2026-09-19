@@ -30,10 +30,21 @@ namespace
 
 	COLORREF LineColorForName(const CString& lineName, size_t index) // 编写者：刘子瑜（3号）
 	{
-		if (lineName.Find(_T("1号线")) >= 0) return RGB(0, 150, 214);
-		if (lineName.Find(_T("3号线")) >= 0) return RGB(0, 168, 98);
-		if (lineName.Find(_T("S1号线")) >= 0) return RGB(0, 177, 64);
-		if (lineName.Find(_T("S3号线")) >= 0) return RGB(176, 92, 153);
+		// 注意：必须用精确匹配，避免 "1号线" 误匹配 "10号线"、"S1号线" 等。
+		if (lineName == _T("1号线"))  return RGB(0, 160, 201);   // 天蓝色
+		if (lineName == _T("2号线"))  return RGB(198, 0, 86);    // 枣红色
+		if (lineName == _T("3号线"))  return RGB(0, 140, 86);    // 薄绿色
+		if (lineName == _T("4号线"))  return RGB(121, 103, 166); // 青紫色
+		if (lineName == _T("5号线"))  return RGB(242, 218, 81);  // 鹅黄色
+		if (lineName == _T("7号线"))  return RGB(0, 90, 60);     // 墨绿色
+		if (lineName == _T("10号线")) return RGB(212, 168, 74);  // 香槟色
+		if (lineName == _T("S1号线")) return RGB(108, 189, 181); // 青绿色
+		if (lineName == _T("S2号线")) return RGB(196, 84, 108);  // 胭脂色
+		if (lineName == _T("S3号线")) return RGB(185, 155, 194); // 粉紫色
+		if (lineName == _T("S6号线")) return RGB(167, 120, 199); // 丁香色
+		if (lineName == _T("S7号线")) return RGB(233, 140, 160); // 薄红梅色
+		if (lineName == _T("S8号线")) return RGB(243, 168, 60);  // 橙黄色
+		if (lineName == _T("S9号线")) return RGB(216, 200, 50);  // 藤黄色
 		static const COLORREF palette[] = {
 			RGB(255, 120, 0), RGB(220, 40, 60),
 			RGB(60, 120, 200), RGB(150, 80, 190)

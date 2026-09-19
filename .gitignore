@@ -29,3 +29,10 @@ x64/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# ===== 本地数据备份 / 中间产物（不入库） =====
+*.bak
+*.seqidbak
+metro_data_new.txt
+service_times_new.txt
+service_times_merged.txt

@@ -21,18 +21,18 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
     UNREFERENCED_PARAMETER(argc);
     Check(AfxWinInit(GetModuleHandle(nullptr),nullptr,GetCommandLine(),0)!=FALSE,"MFC init");
     CMetroData data;Check(data.LoadDataFromFile(_T("metro_data.txt")),"data load");Check(data.ValidateData(),"data valid");
-    Check(data.m_stations.size()==129 && data.m_lines.size()==6,"129 stations / 6 lines");
+    Check(data.m_stations.size()==250 && data.m_lines.size()==14,"250 stations / 14 lines");
     MetroGraph graph;graph.BuildGraph(data);
-    const int n=130;const double inf=1e20;
+    const int n=251;const double inf=1e20;
     std::vector<std::vector<double>> dist(n,std::vector<double>(n,inf));
     std::vector<std::vector<int>> hops(n,std::vector<int>(n,9999));
     std::map<int,std::set<int>> stationLines;
     std::map<int,int> lineIndex;int index=0;for(auto& line:data.m_lines)lineIndex[line.lineId]=index++;
-    int lineDistance[6][6];for(int i=0;i<6;++i)for(int j=0;j<6;++j)lineDistance[i][j]=i==j?0:9999;
+    int lineDistance[14][14];for(int i=0;i<14;++i)for(int j=0;j<14;++j)lineDistance[i][j]=i==j?0:9999;
     size_t edgeCount=0;
     for(const auto& line:data.m_lines){for(int id:line.stationIds)stationLines[id].insert(line.lineId);
         for(size_t i=1;i<line.stationIds.size();++i){int a=line.stationIds[i-1],b=line.stationIds[i];double d=line.distances[i-1];Check(d>0.05 && d<20,"kilometres not metres");dist[a][b]=dist[b][a]=(std::min)(dist[a][b],d);hops[a][b]=hops[b][a]=1;++edgeCount;}}
-    Check(edgeCount==133,"133 undirected intervals");
+    Check(edgeCount==269,"269 undirected intervals");
     int bentEdges=0;
     for(const auto& line:data.m_lines)for(size_t i=1;i<line.stationIds.size();++i){
         int a=line.stationIds[i-1],b=line.stationIds[i];
@@ -44,7 +44,7 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
     }
     Check(bentEdges==15,"all 15 official-map bends belong to real graph intervals");
     for(const auto& s:stationLines)for(int a:s.second)for(int b:s.second)if(a!=b)lineDistance[lineIndex[a]][lineIndex[b]]=1;
-    for(int k=0;k<6;++k)for(int i=0;i<6;++i)for(int j=0;j<6;++j)lineDistance[i][j]=(std::min)(lineDistance[i][j],lineDistance[i][k]+lineDistance[k][j]);
+    for(int k=0;k<14;++k)for(int i=0;i<14;++i)for(int j=0;j<14;++j)lineDistance[i][j]=(std::min)(lineDistance[i][j],lineDistance[i][k]+lineDistance[k][j]);
     for(int i=1;i<n;++i){dist[i][i]=0;hops[i][i]=0;}
     for(int k=1;k<n;++k)for(int i=1;i<n;++i)for(int j=1;j<n;++j){dist[i][j]=(std::min)(dist[i][j],dist[i][k]+dist[k][j]);hops[i][j]=(std::min)(hops[i][j],hops[i][k]+hops[k][j]);}
     // Independent Floyd-Warshall station distances and line-intersection transfer oracle.
@@ -69,7 +69,7 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
     Check(!graph.FindRoute(1,999,STRATEGY_SHORTEST_DIST).isFound,"unknown destination");
     Check(!graph.FindRoute(1,1,(RouteStrategy)99).isFound,"unknown strategy");
     auto interval=graph.FindRoute(1,2,STRATEGY_SHORTEST_DIST);Check(std::abs(interval.totalDistanceKm-1.370)<1e-8 && interval.ticketPrice==2,"known interval 1.370 km not 0.001370 km");
-    auto direct=graph.FindRoute(13,21,STRATEGY_SHORTEST_DIST);std::cout<<"129-station network: Xinjiekou to Nanjing South "<<direct.totalDistanceKm<<" km, fare "<<direct.ticketPrice<<std::endl;
+    auto direct=graph.FindRoute(13,21,STRATEGY_SHORTEST_DIST);std::cout<<"250-station network: Xinjiekou to Nanjing South "<<direct.totalDistanceKm<<" km, fare "<<direct.ticketPrice<<std::endl;
     const double bounds[]={4,9,14,21,28,37,48,61,76,91};
     Check(CalcTicketPrice(0)==0,"zero fare");for(int i=0;i<10;++i){Check(CalcTicketPrice(bounds[i])==i+2,"fare boundary");Check(CalcTicketPrice(bounds[i]+0.001)==i+3,"fare beyond boundary");}
     // New algorithm regression: equal two-stop paths, one path transfers, the other stays on line 3.
@@ -79,7 +79,7 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
     MetroGraph tinyGraph;tinyGraph.BuildGraph(tiny);auto tie=tinyGraph.FindRoute(1,4,STRATEGY_MIN_STATIONS);
     Check(tie.totalStations==2&&tie.transferStations.empty(),"new minimum stations tie-break");
     Check(!tinyGraph.FindRoute(1,5,STRATEGY_MIN_TRANSFERS).isFound,"disconnected station");
-    CServiceTimetable table;Check(table.Load(_T("service_times.txt")),"timetable load");Check(table.Count()==266,"266 unique timetable records");
+    CServiceTimetable table;Check(table.Load(_T("service_times.txt")),"timetable load");Check(table.Count()==538,"538 unique timetable records");
     auto south=table.ForStation(_T("南京南站"));Check(south.size()==6,"Nanjing South six departures");
     bool first=false;for(auto& row:south)if(row.lineId==1&&row.direction==_T("中国药科大学"))first=row.first==_T("06:17")&&row.last==_T("23:54")&&row.lastFriSat==_T("00:16");Check(first,"official Nanjing South weekday and weekend times");
     size_t expectedTimes=0, extras=0;
@@ -99,7 +99,7 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
             if(i+1<line.stationIds.size())Check(actual.count(lastName.GetString())==1,"departure towards last terminus");
         }
     }
-    Check(expectedTimes==table.Count()&&extras==28,"266 directions and 28 additional weekday short turns");
+    Check(expectedTimes==table.Count()&&extras==28,"538 directions and 28 additional weekday short turns");
     Check(CServiceTimetable::DisplayTime(_T("00:16"))==_T("次日 00:16"),"midnight day label");
     Check(table.ForStation(_T("不存在")).empty(),"missing station");
     Check(CServiceTimetable::DisplayTime(_T("--:--"))==_T("待核实"),"missing not fabricated");
@@ -167,6 +167,6 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
     restarted->DeleteContents();delete restarted;
     if(existed){std::ofstream out(docHistoryPath.GetString(),std::ios::binary|std::ios::trunc);out.write(oldBytes.data(),(std::streamsize)oldBytes.size());}
     else DeleteFile(docHistoryPath);
-    std::cout<<"PASS "<<checks<<" checks, "<<routes<<" routes (129 x 129 x 3), 266 timetable records; favorites and MFC lifecycle regressions passed."<<std::endl;
+    std::cout<<"PASS "<<checks<<" checks, "<<routes<<" routes (250 x 250 x 3), 538 timetable records; favorites and MFC lifecycle regressions passed."<<std::endl;
     return 0;
 }

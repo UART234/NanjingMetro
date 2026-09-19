@@ -41,9 +41,15 @@ bool CServiceTimetable::Load(const CString& path) // 编写者：肖博腾（4�
         if ((fields.size() != 6 && fields.size() != 9) || fields[0].IsEmpty() || fields[2].IsEmpty()) continue;
         int id = _ttoi(fields[1]);
         CString canonical; canonical.Format(_T("%d"), id);
-        if (canonical != fields[1] || (id != 1 && id != 2 && id != 3 && id != 4 && id != 11 && id != 13)) continue;
+        // 允许全部 14 条已开通线路的线路 ID（1/2/3/4/5/7/10/S1/S2/S3/S6/S7/S8/S9）
+        static const int kValidLineIds[] = { 1, 2, 3, 4, 5, 7, 10, 11, 12, 13, 14, 15, 16, 17 };
+        bool validId = false;
+        for (int k = 0; k < (int)(sizeof(kValidLineIds) / sizeof(kValidLineIds[0])); ++k)
+            if (id == kValidLineIds[k]) { validId = true; break; }
+        if (canonical != fields[1] || !validId) continue;
         if (!ValidTime(fields[3]) || !ValidTime(fields[4]) ||
-            (fields[5] != _T("amap-2026-09-09") && fields[5] != _T("njmetro-2025-12-19"))) continue;
+            (fields[5] != _T("amap-2026-09-09") && fields[5] != _T("njmetro-2025-12-19") &&
+             fields[5] != _T("njmetro-2026-09-19") && fields[5] != _T("official-2026-09-19"))) continue;
         if(fields.size()==9 && (!ValidTime(fields[6]) ||
             ((fields[7]==_T("-")) != (fields[8]==_T("-"))) ||
             (fields[8]!=_T("-") && !ValidTime(fields[8])))) continue;
