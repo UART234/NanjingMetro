@@ -544,6 +544,20 @@ int CalcTicketPrice(double distanceKm) // 编写者：邓博文（2号）
 	if (distanceKm <= 0.0)
 		return 0;   // 同站
 
+	// 线网里程是各区间小数的累加值，不同路径的累加顺序会产生 1e-12 级浮点误差，
+	// 使本应正好等于分档边界的距离变成 13.999999999999998 或 14.000000000000002，
+	// 导致同一段行程因累加顺序不同而算出不同票价。
+	// 这里把落在边界容差（1e-6 公里，即 1 毫米）内的距离吸附到边界值，保证计价稳定。
+	static const double kBounds[] = { 4.0, 9.0, 14.0, 21.0, 28.0, 37.0, 48.0, 61.0, 76.0, 91.0 };
+	for (int i = 0; i < 10; ++i)
+	{
+		if (fabs(distanceKm - kBounds[i]) < 1e-6)
+		{
+			distanceKm = kBounds[i];
+			break;
+		}
+	}
+
 	if (distanceKm <= 4.0)
 		return 2;
 
