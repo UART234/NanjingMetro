@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "MetroData.h"
 #include "MetroGraph.h"
 #include "RouteStrategy.h"
@@ -6,6 +6,8 @@
 #include "HistoryManager.h"
 #include "NanjingMetroDoc.h"
 #include "MapLayout.h"
+#include "MapLabelLayout.h"
+#include "MetroLayout.h"
 #include <algorithm>
 #include <iostream>
 #include <cmath>
@@ -20,8 +22,48 @@ int main(int argc,char**) // 编写者：肖博腾（4号）
 {
     UNREFERENCED_PARAMETER(argc);
     Check(AfxWinInit(GetModuleHandle(nullptr),nullptr,GetCommandLine(),0)!=FALSE,"MFC init");
+    // Layout regression: precise line corridors leave diagonal corner whitespace available.
+    Check(MapLabels::HitsStroke(CRect(45,45,55,55),CPoint(0,0),CPoint(100,100),2),"label must avoid diagonal stroke");
+    Check(!MapLabels::HitsStroke(CRect(0,70,15,85),CPoint(0,0),CPoint(100,100),2),"diagonal bounding-box whitespace remains usable");
+    Check(MapLabels::HitsStroke(CRect(20,9,40,20),CPoint(0,6),CPoint(100,6),3),"stroke width and edge contact are reserved");
+    Check(!MapLabels::HitsStroke(CRect(20,10,40,20),CPoint(0,6),CPoint(100,6),3),"clear horizontal corridor");
+    Check(MapLabels::HitsStroke(CRect(-40,-40,-20,-20),CPoint(-30,-50),CPoint(-30,0),1),"negative pan coordinates");
+    Check(MapLabels::HitsStroke(CRect(0,0,10,10),CPoint(5,5),CPoint(5,5),0),"zero length point inside label");
+    Check(!MapLabels::HitsStroke(CRect(0,0,10,10),CPoint(15,15),CPoint(15,15),0),"zero length point outside label");
+    std::vector<MapLabels::Label> labels(3);
+    labels[0].id=1;labels[0].priority=0;labels[0].candidates={CRect(0,0,20,10),CRect(40,0,60,10)};
+    labels[1].id=2;labels[1].priority=1;labels[1].candidates={CRect(0,0,20,10)};
+    labels[2].id=3; // no legal candidates is a supported hidden label
+    MapLabels::Arrange(labels,1);
+    Check(labels[0].chosen==1 && labels[1].chosen==0 && labels[2].chosen==-1,"repair moves one blocker without losing a label");
+    Check(!MapLabels::Overlap(labels[0].candidates[labels[0].chosen],labels[1].candidates[labels[1].chosen],1),"label repair preserves spacing");
     CMetroData data;Check(data.LoadDataFromFile(_T("metro_data.txt")),"data load");Check(data.ValidateData(),"data valid");
     Check(data.m_stations.size()==250 && data.m_lines.size()==14,"250 stations / 14 lines");
+    auto originalStations=data.m_stations;
+    MetroLayout::Layout layout;layout.Build(data.m_stations,data.m_lines);
+    Check(layout.Ready(),"schematic layout ready");
+    Check(OfficialMap::Positions().size()==250,"all stations have image-derived display anchors");
+    Check(layout.MarkerPos(192).x<layout.MarkerPos(93).x && layout.MarkerPos(192).y<layout.MarkerPos(93).y,"Line 10 extends west across river");
+    Check(layout.MarkerPos(193).x==layout.MarkerPos(207).x && layout.MarkerPos(207).y>layout.MarkerPos(173).y,"S2 runs south per supplied image");
+    Check(layout.MarkerPos(246).x==layout.MarkerPos(250).x && layout.MarkerPos(250).y>layout.MarkerPos(62).y,"S9 runs south per supplied image");
+    Check(layout.MarkerPos(219).x==layout.MarkerPos(213).x && layout.MarkerPos(219).y>layout.MarkerPos(212).y,"S6 turns south in the east");
+    Check(layout.MarkerPos(227).x==layout.MarkerPos(223).x && layout.MarkerPos(227).y>layout.MarkerPos(64).y,"S7 turns south in the southeast");
+    Check(layout.MarkerPos(228).x==layout.MarkerPos(36).x && layout.MarkerPos(245).y<layout.MarkerPos(36).y,"S8 north then east");
+    Check(layout.MarkerPos(153).x>layout.MarkerPos(5).x,"Line 7 northern terminus lies east of Xiaozhuang");
+
+    for(const auto& line:data.m_lines){
+        auto points=layout.LinePoints(line.lineId);Check(points && points->size()>=line.stationIds.size(),"every line rendered");
+        for(int id:line.stationIds){
+            Check(layout.LineStationPos(line.lineId,id)==layout.MarkerPos(id),"all lines join their clickable station marker");
+            Check(data.m_stations.at(id).pos==originalStations.at(id).pos,"display layout does not mutate data coordinates");
+        }
+        for(size_t i=1;i<line.stationIds.size();++i){
+            int a=line.stationIds[i-1],b=line.stationIds[i];
+            auto f=layout.SegmentPoints(line.lineId,a,b),r=layout.SegmentPoints(line.lineId,b,a);
+            Check(f.size()>=2 && f.front()==layout.MarkerPos(a) && f.back()==layout.MarkerPos(b),"highlight interval joins clickable endpoints");
+            std::reverse(r.begin(),r.end());Check(f==r,"schematic reverse route identical");
+        }
+    }
     MetroGraph graph;graph.BuildGraph(data);
     const int n=251;const double inf=1e20;
     std::vector<std::vector<double>> dist(n,std::vector<double>(n,inf));

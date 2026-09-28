@@ -1,14 +1,15 @@
-// 4号模块：布局、站点详情、方向时刻卡、内嵌路线及查询联动。
+﻿// 4号模块：布局、站点详情、方向时刻卡、内嵌路线及查询联动。
 #include "pch.h"
 #include "framework.h"
 #include "NanjingMetro.h"
 #include "NanjingMetroDoc.h"
 #include "NanjingMetroView.h"
 #include "ServiceTimetable.h"
+#include "MapStyle.h"
 #include <algorithm>
 
 namespace {
-enum { Search=5001, Swap, Plan, SetStart, SetEnd, StationTab, RouteTab, CopyRoute, Favorite, Reset };
+enum { Search=5001, Swap, Plan, SetStart, SetEnd, StationTab, RouteTab, CopyRoute, Favorite, Reset, ZoomIn, ZoomOut };
 void Text(CDC* dc, const CString& text, CRect rect, COLORREF color, UINT flags = DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS) // 编写者：何彦毅（1号）
 {
     dc->SetTextColor(color); dc->DrawText(text, rect, flags | DT_NOPREFIX);
@@ -16,11 +17,13 @@ void Text(CDC* dc, const CString& text, CRect rect, COLORREF color, UINT flags =
 }
 int CNanjingMetroView::Ui(int value) const /* 编写者：何彦毅（1号） */ { return MulDiv(value, (int)GetDpiForWindow(m_hWnd), 96); }
 
+float CNanjingMetroView::UiF(float value) const { return value * GetDpiForWindow(m_hWnd) / 96.0f; }
+
 void CNanjingMetroView::OnInitialUpdate() // 编写者：何彦毅（1号）
 {
     CView::OnInitialUpdate();
     if (m_startCombo.GetSafeHwnd()) {
-        m_selectedStationId=21;m_routeStartStationId=m_routeEndStationId=-1;
+        m_selectedStationId=13;m_routeStartStationId=m_routeEndStationId=-1;
         m_zoom=1.0;m_panOffset=CPoint(0,0);ClearRoute();SyncEndpoints();Invalidate(FALSE);return;
     }
     m_uiFont.CreateFont(-Ui(14),0,0,0,FW_NORMAL,FALSE,FALSE,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,_T("Microsoft YaHei UI"));
@@ -36,42 +39,53 @@ void CNanjingMetroView::OnInitialUpdate() // 编写者：何彦毅（1号）
     }
     m_startCombo.SetCurSel(0); m_endCombo.SetCurSel(0);
     m_strategyCombo.AddString(_T("最短距离")); m_strategyCombo.AddString(_T("最少站数")); m_strategyCombo.AddString(_T("最少换乘")); m_strategyCombo.SetCurSel(0);
-    auto button=[&](CButton& b,LPCTSTR title,UINT id) { b.Create(title,WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(0,0,10,10),this,id); };
+    auto button=[&](CMFCButton& b,LPCTSTR title,UINT id) {
+        b.Create(title,WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(0,0,10,10),this,id);
+        b.m_bDontUseWinXPTheme=TRUE;
+        b.m_nFlatStyle=CMFCButton::BUTTONSTYLE_FLAT;
+        b.SetFaceColor(RGB(248,250,252));
+        b.SetTextColor(RGB(46,63,78));
+        b.SetTextHotColor(RGB(35,111,229));
+    };
     button(m_searchButton,_T("搜索站点 / 地标"),Search); button(m_swapButton,_T("互换"),Swap); button(m_planButton,_T("查询路线"),Plan);
-    m_searchButton.m_bDontUseWinXPTheme=TRUE;
-    m_searchButton.m_nFlatStyle=CMFCButton::BUTTONSTYLE_FLAT;
-    m_searchButton.SetFaceColor(RGB(0,119,163));
+    m_searchButton.SetFaceColor(RGB(35,111,229));
     m_searchButton.SetTextColor(RGB(255,255,255));
     m_searchButton.SetTextHotColor(RGB(255,255,255));
     button(m_startButton,_T("设为起点"),SetStart); button(m_endButton,_T("设为终点"),SetEnd);
     button(m_stationTab,_T("站点 · 首末车"),StationTab); button(m_routeTab,_T("乘车方案"),RouteTab);
     button(m_copyButton,_T("复制指引"),CopyRoute); button(m_favoriteButton,_T("收藏路线"),Favorite);
     button(m_resetMapButton,_T("还原"),Reset);
+    button(m_zoomInButton,_T("＋"),ZoomIn); button(m_zoomOutButton,_T("－"),ZoomOut);
     m_detailScroll.Create(WS_CHILD|WS_VISIBLE|SBS_VERT,CRect(0,0,10,10),this,5030);
     for(CWnd* child=GetWindow(GW_CHILD);child;child=child->GetNextWindow()) child->SetFont(&m_uiFont);
-    m_selectedStationId=21;
+    m_selectedStationId=13;
     LayoutControls();
 }
 
 void CNanjingMetroView::LayoutControls() // 编写者：何彦毅（1号）
 {
     CRect r; GetClientRect(r);
-    int side=Ui(354), gap=Ui(16), top=Ui(164);
-    m_panelRect=CRect(r.right-gap-side,top,r.right-gap,r.bottom-Ui(34));
-    m_mapViewport=CRect(gap,top,m_panelRect.left-gap,r.bottom-Ui(34));
+    int side=(std::min)(Ui(320),(std::max)(Ui(292),r.Width()/4)), gap=Ui(12);
+    const int columns=r.Width()>=Ui(1268)?15:8;
+    const int rows=(15+columns-1)/columns;
+    int top=Ui(112);
+    m_panelRect=CRect(r.right-gap-side,top,r.right-gap,r.bottom-Ui(38+34*rows));
+    m_mapViewport=CRect(gap,top,m_panelRect.left-gap,r.bottom-Ui(38+34*rows));
     m_detailArea=CRect(m_panelRect.left+Ui(18),top+Ui(124),m_panelRect.right-Ui(28),m_panelRect.bottom-Ui(62));
     if(!m_startCombo.GetSafeHwnd())return;
     auto move=[](CWnd& w,CRect rect){ CRect old;w.GetWindowRect(old);w.GetParent()->ScreenToClient(old);if(old!=rect)w.MoveWindow(rect,TRUE); };
-    int y=Ui(119),h=Ui(30), x=gap+Ui(16), available=m_mapViewport.Width()-Ui(32);
-    move(m_searchButton,CRect(x,y-Ui(2),x+Ui(180),y+h+Ui(2)));
-    x+=Ui(192); available-=Ui(192);
+    int y=Ui(64),h=Ui(34), x=gap, available=m_mapViewport.Width();
+    move(m_searchButton,CRect(x,y,x+Ui(156),y+h));
+    x+=Ui(168); available-=Ui(168);
     int combo=(available-Ui(74))/2;
     move(m_startCombo,CRect(x,y,x+combo,y+Ui(290)));
     move(m_swapButton,CRect(x+combo+Ui(10),y,x+combo+Ui(64),y+h));
-    move(m_endCombo,CRect(x+combo+Ui(74),y,m_mapViewport.right-Ui(16),y+Ui(290)));
+    move(m_endCombo,CRect(x+combo+Ui(74),y,m_mapViewport.right,y+Ui(290)));
     x=m_panelRect.left; move(m_strategyCombo,CRect(x,y,x+Ui(128),y+Ui(200)));
     move(m_planButton,CRect(x+Ui(140),y,m_panelRect.right,y+h));
-    move(m_resetMapButton,CRect(m_mapViewport.right-Ui(96),m_mapViewport.bottom-Ui(48),m_mapViewport.right-Ui(16),m_mapViewport.bottom-Ui(14)));
+    move(m_resetMapButton,CRect(m_mapViewport.right-Ui(80),m_mapViewport.bottom-Ui(50),m_mapViewport.right-Ui(16),m_mapViewport.bottom-Ui(16)));
+    move(m_zoomInButton,CRect(m_mapViewport.right-Ui(58),m_mapViewport.bottom-Ui(130),m_mapViewport.right-Ui(16),m_mapViewport.bottom-Ui(94)));
+    move(m_zoomOutButton,CRect(m_mapViewport.right-Ui(58),m_mapViewport.bottom-Ui(92),m_mapViewport.right-Ui(16),m_mapViewport.bottom-Ui(56)));
     int mid=m_panelRect.CenterPoint().x;
     move(m_stationTab,CRect(m_panelRect.left+Ui(12),top+Ui(12),mid-Ui(4),top+Ui(44)));
     move(m_routeTab,CRect(mid+Ui(4),top+Ui(12),m_panelRect.right-Ui(12),top+Ui(44)));
@@ -87,6 +101,22 @@ void CNanjingMetroView::LayoutControls() // 编写者：何彦毅（1号）
     m_favoriteButton.SetWindowText(favorite ? _T("已收藏") : _T("收藏路线"));
     m_favoriteButton.EnableWindow(m_lastRoute.isFound && !favorite);
     m_planButton.EnableWindow(m_routeStartStationId>0 && m_routeEndStationId>0 && m_routeStartStationId!=m_routeEndStationId);
+    // 用颜色明确主操作和当前页签；MFC 仍负责焦点、悬停和禁用状态。
+    const COLORREF surface=m_darkTheme?RGB(53,63,74):RGB(248,250,252);
+    const COLORREF surfaceText=m_darkTheme?RGB(226,234,242):RGB(46,63,78);
+    auto surfaceButton=[&](CMFCButton& button) {
+        button.SetFaceColor(surface);
+        button.SetTextColor(surfaceText);
+        button.SetTextHotColor(RGB(35,111,229));
+    };
+    surfaceButton(m_swapButton); surfaceButton(m_startButton); surfaceButton(m_endButton);
+    surfaceButton(m_copyButton); surfaceButton(m_favoriteButton); surfaceButton(m_resetMapButton); surfaceButton(m_zoomInButton); surfaceButton(m_zoomOutButton);
+    const COLORREF accent=RGB(35,111,229);
+    m_planButton.SetFaceColor(accent); m_planButton.SetTextColor(RGB(255,255,255)); m_planButton.SetTextHotColor(RGB(255,255,255));
+    CMFCButton& activeTab=m_showRoute?m_routeTab:m_stationTab;
+    CMFCButton& inactiveTab=m_showRoute?m_stationTab:m_routeTab;
+    activeTab.SetFaceColor(accent); activeTab.SetTextColor(RGB(255,255,255)); activeTab.SetTextHotColor(RGB(255,255,255));
+    inactiveTab.SetFaceColor(surface); inactiveTab.SetTextColor(surfaceText); inactiveTab.SetTextHotColor(RGB(35,111,229));
     move(m_detailScroll,CRect(m_panelRect.right-Ui(18),m_detailArea.top,m_panelRect.right-Ui(4),m_detailArea.bottom));
 }
 void CNanjingMetroView::OnSize(UINT type,int cx,int cy) /* 编写者：何彦毅（1号） */ { CView::OnSize(type,cx,cy);LayoutControls();RedrawWindow(nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN); }
@@ -120,6 +150,8 @@ void CNanjingMetroView::OnUiAction(UINT id) // 编写者：肖博腾（4号）
     switch(id) {
     case Search:OnQueryStation();break;
     case Reset:OnViewResetMap();break;
+    case ZoomIn:ZoomMap(1.2);break;
+    case ZoomOut:ZoomMap(1.0/1.2);break;
     case Swap:std::swap(m_routeStartStationId,m_routeEndStationId);ClearRoute();SyncEndpoints();break;
     case Plan:QuerySelectedRoute((RouteStrategy)m_strategyCombo.GetCurSel());break;
     case SetStart:SetRouteEndpoint(m_selectedStationId,true);break;
@@ -153,29 +185,49 @@ void CNanjingMetroView::OnVScroll(UINT code,UINT pos,CScrollBar* bar) // 编写�
 
 void CNanjingMetroView::DrawInteractionHeader(CDC* dc,const CRect& r) // 编写者：何彦毅（1号）
 {
-    COLORREF ink=m_darkTheme?RGB(230,237,246):RGB(27,48,67), muted=m_darkTheme?RGB(159,177,194):RGB(103,122,138);
-    CRect header(Ui(16),Ui(12),r.right-Ui(16),Ui(104));dc->FillSolidRect(header,m_darkTheme?RGB(42,49,58):RGB(255,255,255));
-    CFont title;title.CreateFont(-Ui(26),0,0,0,FW_BOLD,FALSE,FALSE,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,_T("Microsoft YaHei UI"));
+    const COLORREF ink=m_darkTheme?RGB(230,237,246):RGB(34,46,60),muted=m_darkTheme?RGB(159,177,194):RGB(112,124,139);
+    const COLORREF paper=m_darkTheme?RGB(42,49,58):RGB(255,255,255);
+    dc->FillSolidRect(CRect(0,0,r.right,Ui(52)),paper);
+    MapStyle::FillRoundRect(dc,CRect(Ui(16),Ui(11),Ui(46),Ui(41)),Ui(8),RGB(35,111,229),0,0);
+    CFont title;title.CreateFont(-Ui(21),0,0,0,FW_BOLD,FALSE,FALSE,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,_T("Microsoft YaHei UI"));
     CFont* old=dc->SelectObject(&title);
-    Text(dc,_T("南京地铁 · 出行指南"),CRect(Ui(32),Ui(19),r.right-Ui(224),Ui(54)),ink);
+    Text(dc,_T("M"),CRect(Ui(16),Ui(11),Ui(46),Ui(41)),RGB(255,255,255),DT_CENTER|DT_SINGLELINE|DT_VCENTER);
+    Text(dc,_T("南京 · 地铁线路图"),CRect(Ui(58),Ui(8),Ui(340),Ui(44)),ink);
     dc->SelectObject(&m_uiFont);
-    Text(dc,_T("站点查询 / 周边导向 / 首末班车"),CRect(Ui(33),Ui(56),r.right-Ui(224),Ui(79)),muted);
-    const std::vector<MetroLine>& lines=GetDocument()->m_metroData.m_lines;
-    int x=Ui(33),y=Ui(90);
-    const int legendLimit=r.right-Ui(20);
-    for(const auto& line:lines){
-        if(x+Ui(74)>legendLimit){x=Ui(33);y+=Ui(20);} // 线路过多时自动换行
-        dc->FillSolidRect(x,y,Ui(20),Ui(4),line.color);Text(dc,line.lineName,CRect(x+Ui(27),y-Ui(9),x+Ui(90),y+Ui(13)),ink);x+=Ui(93);
+    Text(dc,_T("站点查询   /   路线规划"),CRect(r.right-Ui(260),Ui(12),r.right-Ui(20),Ui(42)),muted,DT_RIGHT|DT_SINGLELINE|DT_VCENTER);
+    // 底部线路导航支持点选；“全部”恢复全网。
+    const auto& lines=GetDocument()->m_metroData.m_lines;
+    int columns=r.Width()>=Ui(1268)?15:8,slot=(r.Width()-Ui(32))/columns;
+    int y=m_mapViewport.bottom+Ui(8);m_lineLegend.clear();
+    for(int i=0;i<=(int)lines.size();++i){
+        int id=i==0?-1:lines[i-1].lineId;
+        CRect cell(Ui(16)+(i%columns)*slot,y+(i/columns)*Ui(34),Ui(16)+(i%columns+1)*slot-Ui(6),y+(i/columns)*Ui(34)+Ui(28));
+        m_lineLegend.push_back({cell,id});
+        bool chosen=id==m_selectedLineId;
+        COLORREF color=i==0?RGB(35,111,229):lines[i-1].color;
+        if(chosen)MapStyle::FillRoundRect(dc,cell,Ui(5),m_darkTheme?RGB(51,69,91):RGB(231,239,253),color,UiF(0.8f));
+        if(i>0)dc->FillSolidRect(cell.left+Ui(8),cell.CenterPoint().y-Ui(2),Ui(16),Ui(4),color);
+        CRect text=cell;text.left+=Ui(i?30:8);
+        Text(dc,i==0?_T("全部线路"):lines[i-1].lineName,text,ink);
     }
-    CString status;status.Format(_T("%d 条线路 · %d 站    |    缩放 %d%%    |    拖动平移 · 滚轮缩放 · Ctrl+F 搜索"),(int)lines.size(),(int)GetDocument()->m_metroData.m_stations.size(),(int)(m_zoom*100));
-    Text(dc,status,CRect(Ui(20),r.bottom-Ui(28),r.right-Ui(20),r.bottom-Ui(5)),muted);
+    CString status;status.Format(_T("%d 条线路 · %d 座车站     %d%%    |    滚轮缩放 · 拖动地图 · 点击站点查看详情"),(int)lines.size(),(int)GetDocument()->m_metroData.m_stations.size(),(int)std::lround(m_zoom*100));
+    Text(dc,status,CRect(Ui(20),r.bottom-Ui(27),r.right-Ui(20),r.bottom-Ui(3)),muted);
     dc->SelectObject(old);
 }
+
+void CNanjingMetroView::ZoomMap(double factor)
+{
+    double old=m_zoom;m_zoom=(std::max)(0.65,(std::min)(3.0,m_zoom*factor));
+    double ratio=m_zoom/old;
+    m_panOffset=CPoint((int)std::lround(m_panOffset.x*ratio),(int)std::lround(m_panOffset.y*ratio));
+    Invalidate(FALSE);
+}
+
 void CNanjingMetroView::DrawGeography(CDC* dc) // 编写者：刘子瑜（3号）
 {
-    // 示意长江，与柳洲东路—上元门、刘村—马骡圩过江段相交，不作为精确地理底图。
-    CPoint river[]={CPoint(210,1450),CPoint(210,750),CPoint(505,377),CPoint(1150,377),CPoint(1150,418),CPoint(533,418),CPoint(265,770),CPoint(265,1450)};
-    for(auto& pt:river)pt=StationToScreen(pt);
+    // 参考图同款的轻量折角江面与左上角方位提示。
+    CPoint river[]={CPoint(210,1600),CPoint(210,750),CPoint(505,377),CPoint(1150,377),CPoint(1150,418),CPoint(533,418),CPoint(265,770),CPoint(265,1600)};
+    for(auto& pt:river)pt=StationToScreen(MetroLayout::DisplayPosition(pt));
     CBrush brush(m_darkTheme?RGB(36,64,81):RGB(233,244,250));CBrush* old=dc->SelectObject(&brush);CPen* pen=(CPen*)dc->SelectStockObject(NULL_PEN);dc->Polygon(river,_countof(river));dc->SelectObject(pen);dc->SelectObject(old);
     CFont* font=dc->SelectObject(&m_uiFont);int x=m_mapViewport.left+Ui(22),y=m_mapViewport.top+Ui(18);
     Text(dc,_T("N"),CRect(x-Ui(5),y,x+Ui(16),y+Ui(20)),RGB(114,141,161));
@@ -195,9 +247,9 @@ void CNanjingMetroView::DrawStationDetails(CDC* dc,const CRect& client) // 编�
     UNREFERENCED_PARAMETER(client);
     COLORREF ink=m_darkTheme?RGB(230,237,246):RGB(27,48,67), muted=m_darkTheme?RGB(159,177,194):RGB(103,122,138);
     COLORREF paper=m_darkTheme?RGB(42,49,58):RGB(255,255,255),rule=m_darkTheme?RGB(64,77,89):RGB(228,235,240);
-    dc->FillSolidRect(m_panelRect,paper);CFont* old=dc->SelectObject(&m_uiFont);
+    dc->FillSolidRect(m_panelRect,paper);dc->Draw3dRect(m_panelRect,rule,rule);CFont* old=dc->SelectObject(&m_uiFont);
     CRect indicator=m_showRoute?CRect(m_panelRect.CenterPoint().x+Ui(4),m_panelRect.top+Ui(48),m_panelRect.right-Ui(12),m_panelRect.top+Ui(51)):CRect(m_panelRect.left+Ui(12),m_panelRect.top+Ui(48),m_panelRect.CenterPoint().x-Ui(4),m_panelRect.top+Ui(51));
-    dc->FillSolidRect(indicator,RGB(0,145,204));
+    dc->FillSolidRect(indicator,RGB(35,111,229));
     StationNode* station=GetDocument()->m_metroData.GetStationById(m_selectedStationId);
     CFont title;title.CreateFont(-Ui(23),0,0,0,FW_BOLD,FALSE,FALSE,0,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,_T("Microsoft YaHei UI"));
     dc->SelectObject(&title);
@@ -214,7 +266,7 @@ void CNanjingMetroView::DrawStationDetails(CDC* dc,const CRect& client) // 编�
         if(!m_lastRoute.isFound)paragraph(_T("在顶部选择起点与终点，然后点击“查询路线”。可切换最短距离、最少站数和最少换乘。"),muted);
         else{
             paragraph(m_lastRoute.startStationName+_T(" → ")+m_lastRoute.endStationName,ink);
-            CString metrics;metrics.Format(_T("%d 站   /   %d 次换乘   /   %d 元\r\n%.3f km   ·   估算约 %d 分钟"),m_lastRoute.totalStations,(int)m_lastRoute.transferStations.size(),m_lastRoute.ticketPrice,m_lastRoute.totalDistanceKm,m_lastRoute.totalStations*2+(int)m_lastRoute.transferStations.size()*2);paragraph(metrics,RGB(0,145,204));
+            CString metrics;metrics.Format(_T("%d 站   /   %d 次换乘   /   %d 元\r\n%.3f km   ·   估算约 %d 分钟"),m_lastRoute.totalStations,(int)m_lastRoute.transferStations.size(),m_lastRoute.ticketPrice,m_lastRoute.totalDistanceKm,m_lastRoute.totalStations*2+(int)m_lastRoute.transferStations.size()*2);paragraph(metrics,RGB(35,111,229));
             paragraph(_T("里程/票价基于课程数据；用时按每站2分钟、每次换乘2分钟估算。"),muted);
             section(_T("乘车指引"));
             for(size_t i=0;i<m_lastRoute.transferGuides.size();++i){const auto& seg=m_lastRoute.transferGuides[i];CString step;step.Format(_T("%d  %s · 往%s\r\n%s → %s（%d站）"),(int)i+1,seg.lineName.GetString(),seg.directionStationName.GetString(),seg.startStationName.GetString(),seg.endStationName.GetString(),seg.passStationCount);paragraph(step,ink,12);

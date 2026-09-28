@@ -5,6 +5,7 @@
 #pragma once
 
 #include "MetroDef.h"
+#include "MetroLayout.h"
 #include <vector>
 
 class CNanjingMetroView : public CView
@@ -44,6 +45,8 @@ public:
     afx_msg void OnUiAction(UINT id);
     afx_msg void OnEndpointChanged();
     int Ui(int value) const;
+    float UiF(float value) const;
+    int m_visibleLabelCount = 0;
     void LayoutControls();
     void SyncEndpoints();
     void ClearRoute();
@@ -52,9 +55,13 @@ public:
     CFont m_uiFont;
     CComboBox m_startCombo, m_endCombo, m_strategyCombo;
     CMFCButton m_searchButton;
-    CButton m_resetMapButton;
-    CButton m_swapButton, m_planButton, m_startButton, m_endButton;
-    CButton m_stationTab, m_routeTab, m_copyButton, m_favoriteButton;
+    // 使用统一的 MFC 平面按钮，避免原生按钮与搜索按钮在高 DPI 下风格割裂。
+    CMFCButton m_resetMapButton, m_zoomInButton, m_zoomOutButton;
+    int m_selectedLineId = -1;
+    std::vector<std::pair<CRect,int>> m_lineLegend;
+    void ZoomMap(double factor);
+    CMFCButton m_swapButton, m_planButton, m_startButton, m_endButton;
+    CMFCButton m_stationTab, m_routeTab, m_copyButton, m_favoriteButton;
     CScrollBar m_detailScroll;
     CRect m_panelRect, m_detailArea;
     int m_detailOffset = 0, m_detailMax = 0;
@@ -79,6 +86,10 @@ protected:
 	int m_routeStartStationId;
 	int m_routeEndStationId;
 	double m_drawScale;
+	// Schematic maps intentionally use a wider, slightly flatter frame than
+	// geographic coordinates so dense interchange areas remain legible.
+	double m_drawAspectX;
+	double m_drawAspectY;
 	double m_minDataX;
 	double m_minDataY;
 	int m_drawOriginX;
@@ -86,6 +97,9 @@ protected:
 	CRect m_mapViewport;
 
 	CPoint StationToScreen(const CPoint& position) const;
+	// 原图描摹版式，只影响绘制，不修改站点业务坐标
+	const MetroLayout::Layout& Metro() const;
+	mutable MetroLayout::Layout m_layout;
 	int HitTestStation(const CPoint& point) const;
 	void SelectStation(int stationId, bool centerOnStation);
 	void CenterOnStation(int stationId);
@@ -124,4 +138,3 @@ public:
 inline CNanjingMetroDoc* CNanjingMetroView::GetDocument() const // 编写者：何彦毅（1号）
    { return reinterpret_cast<CNanjingMetroDoc*>(m_pDocument); }
 #endif
-

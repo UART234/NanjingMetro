@@ -64,6 +64,7 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="MapLayout.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="MapLabelLayout.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="MapDrawing.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="ServiceTimetable.h"><Filter>头文件</Filter></ClInclude>
   </ItemGroup>
@@ -108,7 +109,6 @@
     <ClCompile Include="ServiceTimetable.cpp"><Filter>源文件</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="NanjingMetro.reg" />
     <None Include="res\NanjingMetro.rc2">
       <Filter>资源文件</Filter>
     </None>

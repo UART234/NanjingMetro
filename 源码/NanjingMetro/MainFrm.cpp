@@ -63,6 +63,8 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct) // 编写者：何彦毅
 	m_wndToolBar.EnableDocking(CBRS_ALIGN_ANY);
 	EnableDocking(CBRS_ALIGN_ANY);
 	DockControlBar(&m_wndToolBar);
+    ShowControlBar(&m_wndToolBar,FALSE,FALSE);
+    ShowControlBar(&m_wndStatusBar,FALSE,FALSE);
 
 
 	return 0;

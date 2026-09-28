@@ -57,6 +57,14 @@ CNanjingMetroApp theApp;
 
 BOOL CNanjingMetroApp::InitInstance() // 编写者：何彦毅（1号）
 {
+	// DPI 感知（关键）：在 125% / 150% 等高缩放显示器上，
+	// 未声明 DPI 感知的进程会被 Windows 按缩放比例做整窗位图拉伸，
+	// 文字、细线、抗锯齿边缘全部被插值糊掉，界面看起来像"蒙了一层雾"。
+	// 这里必须在创建任何窗口之前把进程标记为"系统 DPI 感知"，
+	// 让绘制直接落在物理像素上，界面才会锐利清晰。
+	// 该行为与正式提交版 exe 清单中的 <dpiAware>true</dpiAware> 完全一致。
+	SetProcessDPIAware();
+
 	// 如果一个运行在 Windows XP 上的应用程序清单指定要
 	// 使用 ComCtl32.dll 版本 6 或更高版本来启用可视化方式，
 	//则需要 InitCommonControlsEx()。  否则，将无法创建窗口。
