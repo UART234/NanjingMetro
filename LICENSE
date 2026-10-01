@@ -1,22 +1,65 @@
-MIT License
+NanjingMetro Non-Commercial License
+Version 1.0
+Copyright (c) 2026 UART234
+
+1. Grant of Rights
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to:
+
+- view and study the source code;
+- use the Software for personal purposes;
+- use the Software for educational and academic purposes;
+- modify the Software for personal, educational, or academic purposes;
+- create derivative works for personal, educational, or academic purposes.
+
+2. Restrictions
+
+Without prior written permission from the copyright holder, you may NOT:
+
+- use the Software or any substantial portion of the Software for commercial
+  purposes;
+- sell, rent, lease, sublicense, or commercially distribute the Software;
+- include the Software or any substantial portion of the Software in a
+  commercial product or service;
+- deploy the Software for commercial operation or for commercial benefit;
+- create and distribute a commercial derivative work based substantially
+  on the Software.
+
+3. Attribution
+
+Any copy, substantial portion, or derivative work of the Software used for
+personal, educational, or academic purposes must retain this copyright notice
+and this license notice.
 
 Copyright (c) 2026 UART234
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+4. Third-Party Materials
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+This license applies only to the original source code and other materials
+owned or controlled by the copyright holder.
+
+Third-party data, maps, images, fonts, icons, libraries, datasets, trademarks,
+and other materials included in or associated with the Software remain subject
+to their respective licenses and terms of use.
+
+This license does not grant any additional rights to third-party materials.
+
+5. Commercial Permission
+
+Commercial use may be permitted only with prior written authorization from
+the copyright holder.
+
+Requests for commercial use, commercial distribution, commercial deployment,
+or other commercial licensing should be directed to the copyright holder.
+
+6. Disclaimer
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-````
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
