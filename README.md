@@ -254,4 +254,6 @@ service_times.txt
 
 2026
 
+This project is publicly available for viewing and non-commercial use.
+Commercial rights are reserved by the copyright holder.
 ````
